@@ -48,7 +48,7 @@
   const LOCAL_MEMBERS_KEY = 'team_todo_local_members';
 
   // สามารถนำ Web App URL มาใส่ตรงนี้ได้โดยตรง (หรือจะกดใส่ผ่านปุ่มหน้าเว็บก็ได้)
-  const DEFAULT_API_URL = '';
+  const DEFAULT_API_URL = 'https://script.google.com/macros/s/AKfycbwVCoaAw2YaBgwQI0z7X3GR3ihvg9GzHzN_8UGstR6bT6FC4vA70yBy_1SHsHpXC0N2Tw/exec';
 
   // รายชื่อสมาชิกเริ่มต้น
   const INITIAL_MEMBERS = [
