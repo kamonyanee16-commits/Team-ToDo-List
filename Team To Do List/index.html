@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ระบบติดตามงานทีม (Team To Do List) - Kanban & Dashboard</title>
+  <!-- Google Fonts: Prompt -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Prompt:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    if (typeof tailwind !== 'undefined') {
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Prompt', 'sans-serif'],
+            },
+            colors: {
+              brand: {
+                50: '#eff6ff',
+                100: '#dbeafe',
+                500: '#3b82f6',
+                600: '#2563eb',
+                700: '#1d4ed8',
+              }
+            }
+          }
+        }
+      };
+    }
+  </script>
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="bg-slate-50 min-h-screen text-slate-800 antialiased flex flex-col">
+
+  <!-- TOP NAVBAR -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between h-16">
+        
+        <!-- Logo / App Branding -->
+        <div class="flex items-center space-x-3">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center text-white shadow-md shadow-blue-500/20">
+            <i class="fa-solid fa-list-check text-lg"></i>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h1 class="font-bold text-lg text-slate-900 leading-tight">Team To Do List</h1>
+              <span id="backend-badge" class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
+                <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                <span>โหมดทดลอง (Mock Data)</span>
+              </span>
+            </div>
+            <p class="text-xs text-slate-500 hidden sm:block">ระบบติดตามภาระงานทีม เชื่อมต่อ Google Sheets & Drive</p>
+          </div>
+        </div>
+
+        <!-- Right Controls: Settings & User Switcher -->
+        <div class="flex items-center space-x-3">
+          
+          <!-- Connect Google Sheet Button -->
+          <button id="btn-open-settings" onclick="window.TodoApp && window.TodoApp.openSettingsModal()" class="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors border border-slate-300 shadow-xs cursor-pointer">
+            <i class="fa-solid fa-cloud text-blue-600"></i>
+            <span class="inline">เชื่อมต่อ Google Sheet</span>
+          </button>
+
+          <!-- Divider -->
+          <div class="h-6 w-px bg-slate-200 hidden sm:block"></div>
+
+          <!-- Current User Switcher Dropdown -->
+          <div class="relative">
+            <label class="text-[10px] text-slate-400 block font-medium uppercase tracking-wider mb-0.5 hidden sm:block">กำลังใช้งานในฐานะ</label>
+            <div class="flex items-center gap-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl p-1.5 pr-3 transition cursor-pointer" id="user-menu-button" onclick="window.TodoApp && window.TodoApp.toggleUserMenu()">
+              <div id="current-user-avatar" class="w-8 h-8 rounded-lg bg-blue-600 text-white font-semibold flex items-center justify-center text-xs shadow-sm">
+                นบ
+              </div>
+              <div class="text-left">
+                <div class="flex items-center gap-1.5">
+                  <span id="current-user-name" class="text-xs font-semibold text-slate-800 line-clamp-1">คุณ นาวิน บุญสุวรรณ</span>
+                  <span id="current-user-role-badge" class="px-1.5 py-0.2 rounded text-[10px] font-medium bg-blue-100 text-blue-700">หัวหน้างาน</span>
+                </div>
+              </div>
+              <i class="fa-solid fa-chevron-down text-slate-400 text-xs ml-1"></i>
+            </div>
+
+            <!-- Dropdown Menu -->
+            <div id="user-dropdown-menu" style="display: none;" class="hidden absolute right-0 mt-2 w-72 bg-white rounded-xl shadow-xl border border-slate-200 py-2 z-50 animate-fadeIn">
+              <div class="px-3 py-2 border-b border-slate-100 text-xs font-medium text-slate-400">
+                เลือกโปรไฟล์ผู้ใช้งานเพื่อทดสอบสิทธิ์
+              </div>
+              <div id="user-options-list" class="divide-y divide-slate-50 max-h-80 overflow-y-auto">
+                <!-- Injected via JS -->
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN CONTAINER -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+    <!-- READ-ONLY NOTICE BANNER (Displayed when a member views another member's board) -->
+    <div id="read-only-banner" style="display: none;" class="hidden bg-amber-50 border-l-4 border-amber-500 p-4 rounded-r-xl shadow-sm animate-fadeIn">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center space-x-3">
+          <div class="w-8 h-8 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center font-bold">
+            <i class="fa-solid fa-lock text-sm"></i>
+          </div>
+          <div>
+            <h4 class="text-sm font-semibold text-amber-900" id="read-only-title">โหมดดูงานของเพื่อนร่วมทีม (อ่านอย่างเดียว)</h4>
+            <p class="text-xs text-amber-700">คุณสามารถดูรายละเอียดงานของเพื่อนได้ แต่ไม่สามารถเพิ่ม แก้ไข หรือเคลื่อนย้ายงานได้</p>
+          </div>
+        </div>
+        <button id="btn-back-to-my-board" class="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-medium shadow-sm transition">
+          <i class="fa-solid fa-arrow-left mr-1"></i> กลับไปบอร์ดของฉัน
+        </button>
+      </div>
+    </div>
+
+    <!-- MANAGER DASHBOARD OVERVIEW SECTION (Only visible for Manager) -->
+    <section id="manager-dashboard" class="space-y-4">
+      <div class="flex items-center justify-between">
+        <div>
+          <h2 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+            <i class="fa-solid fa-chart-pie text-blue-600"></i>
+            <span>ภาพรวมงานของทุกคนในทีม</span>
+          </h2>
+          <p class="text-xs text-slate-500">สรุปสถานะงานและความคืบหน้าของสมาชิกทุกคนแบบเรียลไทม์</p>
+        </div>
+        <span class="text-xs text-slate-400 bg-slate-100 px-2.5 py-1 rounded-md">
+          <i class="fa-regular fa-clock mr-1"></i> อัปเดตล่าสุด: <span id="last-sync-time">วันนี้</span>
+        </span>
+      </div>
+
+      <!-- Top Summary Metrics Cards (5 Stats) -->
+      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
+        
+        <!-- Total Tasks -->
+        <div class="bg-white rounded-xl p-4 border border-slate-200 shadow-sm flex items-center justify-between">
+          <div>
+            <p class="text-xs font-medium text-slate-500">งานทั้งหมด</p>
+            <h3 id="stat-total-tasks" class="text-2xl font-bold text-slate-900 mt-1">0</h3>
+            <span class="text-[11px] text-slate-400">รายการงานในระบบ</span>
+          </div>
+          <div class="w-11 h-11 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center text-lg">
+            <i class="fa-solid fa-layer-group"></i>
+          </div>
+        </div>
+
+        <!-- In Progress -->
+        <div class="bg-white rounded-xl p-4 border border-amber-200 shadow-sm flex items-center justify-between">
+          <div>
+            <p class="text-xs font-medium text-amber-700">กำลังดำเนินการ</p>
+            <h3 id="stat-progress-tasks" class="text-2xl font-bold text-amber-600 mt-1">0</h3>
+            <span class="text-[11px] text-amber-600/80">กำลังเร่งทำ</span>
+          </div>
+          <div class="w-11 h-11 rounded-xl bg-amber-50 text-amber-500 flex items-center justify-center text-lg">
+            <i class="fa-solid fa-bolt"></i>
+          </div>
+        </div>
+
+        <!-- In Review -->
+        <div class="bg-white rounded-xl p-4 border border-purple-200 shadow-sm flex items-center justify-between">
+          <div>
+            <p class="text-xs font-medium text-purple-700">รอตรวจสอบ</p>
+            <h3 id="stat-review-tasks" class="text-2xl font-bold text-purple-600 mt-1">0</h3>
+            <span class="text-[11px] text-purple-600/80">รอหัวหน้าตรวจ</span>
+          </div>
+          <div class="w-11 h-11 rounded-xl bg-purple-50 text-purple-500 flex items-center justify-center text-lg">
+            <i class="fa-solid fa-magnifying-glass-check"></i>
+          </div>
+        </div>
+
+        <!-- Overdue / Due Soon -->
+        <div class="bg-white rounded-xl p-4 border border-rose-200 shadow-sm flex items-center justify-between">
+          <div>
+            <p class="text-xs font-medium text-rose-700">เลย / ใกล้กำหนด</p>
+            <h3 id="stat-overdue-tasks" class="text-2xl font-bold text-rose-600 mt-1">0</h3>
+            <span class="text-[11px] text-rose-600/80">ต้องติดตามด่วน</span>
+          </div>
+          <div class="w-11 h-11 rounded-xl bg-rose-50 text-rose-500 flex items-center justify-center text-lg pulse-badge">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+          </div>
+        </div>
+
+        <!-- Done -->
+        <div class="bg-white rounded-xl p-4 border border-emerald-200 shadow-sm flex items-center justify-between col-span-2 sm:col-span-1">
+          <div>
+            <p class="text-xs font-medium text-emerald-700">เสร็จสมบูรณ์</p>
+            <h3 id="stat-done-tasks" class="text-2xl font-bold text-emerald-600 mt-1">0</h3>
+            <span class="text-[11px] text-emerald-600/80">ปิดงานเรียบร้อย</span>
+          </div>
+          <div class="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-500 flex items-center justify-center text-lg">
+            <i class="fa-solid fa-circle-check"></i>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Team Workload Distribution Strip -->
+      <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+        <h4 class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">
+          <i class="fa-solid fa-users text-blue-500 mr-1.5"></i> ภาระงานรายบุคคล (คลิกเพื่อกรองดูบอร์ดของสมาชิกคนนั้น)
+        </h4>
+        <div id="team-workload-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+          <!-- Injected via JS -->
+        </div>
+      </div>
+    </section>
+
+    <!-- CONTROLS & FILTER BAR -->
+    <section class="bg-white rounded-xl border border-slate-200 p-4 shadow-sm space-y-3">
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
+        
+        <!-- Left: View Mode & Assignee Filter -->
+        <div class="flex flex-wrap items-center gap-2">
+          
+          <!-- Filter Assignee Selector -->
+          <div class="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5">
+            <i class="fa-solid fa-user-tag text-slate-400 text-xs"></i>
+            <span class="text-xs text-slate-500 font-medium">ดูงานของ:</span>
+            <select id="filter-assignee" class="bg-transparent text-xs font-semibold text-slate-800 outline-none cursor-pointer">
+              <!-- Injected via JS -->
+            </select>
+          </div>
+
+          <!-- View Mode: Kanban vs Table -->
+          <div class="inline-flex rounded-lg border border-slate-200 p-0.5 bg-slate-50">
+            <button id="view-kanban-btn" class="px-3 py-1 text-xs font-medium rounded-md bg-white text-blue-600 shadow-sm transition">
+              <i class="fa-solid fa-table-columns mr-1"></i> Kanban บอร์ด
+            </button>
+            <button id="view-table-btn" class="px-3 py-1 text-xs font-medium rounded-md text-slate-600 hover:text-slate-900 transition">
+              <i class="fa-solid fa-table-list mr-1"></i> ตารางรายการ
+            </button>
+          </div>
+
+          <!-- Priority Filter -->
+          <select id="filter-priority" class="text-xs bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-slate-700 outline-none cursor-pointer">
+            <option value="all">ความสำคัญ: ทั้งหมด</option>
+            <option value="Urgent">🔴 ด่วนมาก</option>
+            <option value="Medium">🟡 ปานกลาง</option>
+            <option value="Normal">🟢 ปกติ</option>
+          </select>
+
+        </div>
+
+        <!-- Right: Search & Add Task Button -->
+        <div class="flex items-center gap-2">
+          
+          <!-- Search Box -->
+          <div class="relative flex-1 sm:w-64">
+            <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-xs"></i>
+            <input type="text" id="search-input" placeholder="ค้นหางาน, รายละเอียด..." 
+              class="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition">
+          </div>
+
+          <!-- Add Task Button -->
+          <button id="btn-add-task" onclick="window.TodoApp && window.TodoApp.openTaskModal()" class="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm shadow-blue-500/20 transition whitespace-nowrap cursor-pointer">
+            <i class="fa-solid fa-plus"></i>
+            <span id="btn-add-task-label">เพิ่มงานใหม่</span>
+          </button>
+
+        </div>
+
+      </div>
+    </section>
+
+    <!-- KANBAN BOARD CONTAINER -->
+    <section id="kanban-view" class="space-y-4">
+      <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 items-start">
+        
+        <!-- Column 1: To Do -->
+        <div class="kanban-column bg-slate-100/70 rounded-2xl border border-slate-200/80 p-3 flex flex-col" data-status="To Do">
+          <div class="flex items-center justify-between pb-2.5 mb-2 border-b border-slate-200">
+            <div class="flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
+              <h3 class="text-xs font-bold text-slate-700 uppercase tracking-wider">To Do (รอดำเนินการ)</h3>
+            </div>
+            <span class="column-count text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">0</span>
+          </div>
+          <div class="kanban-cards-area space-y-3 p-1 rounded-xl flex-1" data-status="To Do">
+            <!-- Cards injected via JS -->
+          </div>
+        </div>
+
+        <!-- Column 2: In Progress -->
+        <div class="kanban-column bg-slate-100/70 rounded-2xl border border-slate-200/80 p-3 flex flex-col" data-status="In Progress">
+          <div class="flex items-center justify-between pb-2.5 mb-2 border-b border-slate-200">
+            <div class="flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+              <h3 class="text-xs font-bold text-slate-700 uppercase tracking-wider">In Progress (กำลังทำ)</h3>
+            </div>
+            <span class="column-count text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">0</span>
+          </div>
+          <div class="kanban-cards-area space-y-3 p-1 rounded-xl flex-1" data-status="In Progress">
+            <!-- Cards injected via JS -->
+          </div>
+        </div>
+
+        <!-- Column 3: In Review -->
+        <div class="kanban-column bg-slate-100/70 rounded-2xl border border-slate-200/80 p-3 flex flex-col" data-status="In Review">
+          <div class="flex items-center justify-between pb-2.5 mb-2 border-b border-slate-200">
+            <div class="flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-purple-500"></span>
+              <h3 class="text-xs font-bold text-slate-700 uppercase tracking-wider">In Review (รอตรวจ)</h3>
+            </div>
+            <span class="column-count text-xs font-semibold px-2 py-0.5 rounded-full bg-purple-100 text-purple-700">0</span>
+          </div>
+          <div class="kanban-cards-area space-y-3 p-1 rounded-xl flex-1" data-status="In Review">
+            <!-- Cards injected via JS -->
+          </div>
+        </div>
+
+        <!-- Column 4: On Hold -->
+        <div class="kanban-column bg-slate-100/70 rounded-2xl border border-slate-200/80 p-3 flex flex-col" data-status="On Hold">
+          <div class="flex items-center justify-between pb-2.5 mb-2 border-b border-slate-200">
+            <div class="flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-slate-400"></span>
+              <h3 class="text-xs font-bold text-slate-700 uppercase tracking-wider">On Hold (พักไว้)</h3>
+            </div>
+            <span class="column-count text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-200 text-slate-700">0</span>
+          </div>
+          <div class="kanban-cards-area space-y-3 p-1 rounded-xl flex-1" data-status="On Hold">
+            <!-- Cards injected via JS -->
+          </div>
+        </div>
+
+        <!-- Column 5: Done -->
+        <div class="kanban-column bg-slate-100/70 rounded-2xl border border-slate-200/80 p-3 flex flex-col" data-status="Done">
+          <div class="flex items-center justify-between pb-2.5 mb-2 border-b border-slate-200">
+            <div class="flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+              <h3 class="text-xs font-bold text-slate-700 uppercase tracking-wider">Done (เสร็จสิ้น)</h3>
+            </div>
+            <span class="column-count text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">0</span>
+          </div>
+          <div class="kanban-cards-area space-y-3 p-1 rounded-xl flex-1" data-status="Done">
+            <!-- Cards injected via JS -->
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- TABLE VIEW CONTAINER (Hidden by default, can be toggled) -->
+    <section id="table-view" style="display: none;" class="hidden bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs border-collapse">
+          <thead>
+            <tr class="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase tracking-wider">
+              <th class="py-3 px-4">ชื่องาน & รายละเอียด</th>
+              <th class="py-3 px-4">ผู้รับผิดชอบ</th>
+              <th class="py-3 px-4">สถานะ</th>
+              <th class="py-3 px-4">ความสำคัญ</th>
+              <th class="py-3 px-4">วันเริ่ม</th>
+              <th class="py-3 px-4">วันกำหนดส่ง (Deadline)</th>
+              <th class="py-3 px-4">ไฟล์แนบ</th>
+              <th class="py-3 px-4 text-center">จัดการ</th>
+            </tr>
+          </thead>
+          <tbody id="table-tasks-body" class="divide-y divide-slate-100 text-slate-700">
+            <!-- Injected via JS -->
+          </tbody>
+        </table>
+      </div>
+      <div id="table-empty-notice" style="display: none;" class="hidden py-12 text-center text-slate-400">
+        <i class="fa-solid fa-inbox text-4xl mb-2"></i>
+        <p>ไม่พบรายการงานตามเงื่อนไขที่เลือก</p>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="bg-white border-t border-slate-200 py-4 mt-auto">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-xs text-slate-400">
+      ระบบติดตามงานทีม (Team To Do List) • รองรับ Google Sheets & Google Drive • พร้อมใช้งานบน GitHub Pages
+    </div>
+  </footer>
+
+  <!-- ========================================================================= -->
+  <!-- MODAL: ADD / EDIT TASK -->
+  <!-- ========================================================================= -->
+  <div id="task-modal" style="display: none;" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm modal-overlay">
+    <div class="bg-white rounded-2xl shadow-2xl border border-slate-100 w-full max-w-lg overflow-hidden modal-content max-h-[90vh] flex flex-col">
+      
+      <!-- Modal Header -->
+      <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center font-bold">
+            <i class="fa-solid fa-pen-to-square"></i>
+          </div>
+          <div>
+            <h3 id="modal-task-title" class="font-bold text-slate-900 text-sm">เพิ่มงานใหม่</h3>
+            <p class="text-[11px] text-slate-500">กรอกรายละเอียดงานเพื่อมอบหมายหรือติดตาม</p>
+          </div>
+        </div>
+        <button id="btn-close-task-modal" class="text-slate-400 hover:text-slate-600 text-lg transition">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <!-- Modal Body (Scrollable) -->
+      <form id="task-form" class="p-6 space-y-4 overflow-y-auto flex-1 text-xs">
+        <input type="hidden" id="form-task-id">
+
+        <!-- Title -->
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">ชื่องาน <span class="text-rose-500">*</span></label>
+          <input type="text" id="form-title" required placeholder="เช่น จัดเตรียมรายงานผลการดำเนินงาน..." 
+            class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-xs">
+        </div>
+
+        <!-- Description -->
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">รายละเอียดงาน</label>
+          <textarea id="form-description" rows="3" placeholder="ระบุขอบเขตงาน รายละเอียด หรือขั้นตอนที่ต้องทำ..."
+            class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-xs"></textarea>
+        </div>
+
+        <!-- Assignee & Priority (2 Cols) -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">ผู้รับผิดชอบ <span class="text-rose-500">*</span></label>
+            <select id="form-assignee" required class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-xs">
+              <!-- Injected via JS -->
+            </select>
+            <p id="form-assignee-hint" class="text-[10px] text-slate-400 mt-1 hidden">ทีมงานสามารถเพิ่มงานให้ตนเองได้เท่านั้น</p>
+          </div>
+
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">ระดับความสำคัญ</label>
+            <select id="form-priority" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-xs">
+              <option value="Normal">🟢 ปกติ (Normal)</option>
+              <option value="Medium">🟡 ปานกลาง (Medium)</option>
+              <option value="Urgent">🔴 ด่วนมาก (Urgent)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Status -->
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">สถานะงาน</label>
+          <select id="form-status" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-xs">
+            <option value="To Do">📋 To Do (รอดำเนินการ)</option>
+            <option value="In Progress">⚡ In Progress (กำลังทำ)</option>
+            <option value="In Review">🔍 In Review (รอตรวจ)</option>
+            <option value="On Hold">⏸️ On Hold (พักไว้/ติดปัญหา)</option>
+            <option value="Done">✅ Done (เสร็จสิ้น)</option>
+          </select>
+        </div>
+
+        <!-- Dates: Start Date & Deadline (2 Cols) -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">วันที่เริ่ม</label>
+            <input type="date" id="form-start-date" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-xs">
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">วันกำหนดส่ง (Deadline)</label>
+            <input type="date" id="form-deadline" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-xs">
+          </div>
+        </div>
+
+        <!-- File Attachment -->
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">
+            <i class="fa-solid fa-paperclip mr-1 text-slate-400"></i> แนบไฟล์รูปภาพ หรือเอกสาร
+          </label>
+          <div class="border-2 border-dashed border-slate-300 rounded-xl p-4 text-center hover:bg-blue-50/50 hover:border-blue-400 transition cursor-pointer select-none" id="drop-zone">
+            <input type="file" id="form-file-input" class="hidden" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.zip">
+            <div class="pointer-events-none">
+              <i class="fa-solid fa-cloud-arrow-up text-2xl text-blue-500 mb-1"></i>
+              <p class="text-xs text-slate-700 font-semibold">คลิกเพื่อเลือกไฟล์ หรือลากไฟล์มาวางที่นี่</p>
+              <p class="text-[10px] text-slate-400 mt-0.5">รองรับ รูปภาพ (PNG, JPG), PDF, Word, Excel</p>
+            </div>
+          </div>
+
+          <!-- Existing / Uploaded File Indicator -->
+          <div id="file-preview-container" class="hidden mt-2 p-2.5 bg-slate-100 rounded-lg flex items-center justify-between border border-slate-200">
+            <div class="flex items-center gap-2 overflow-hidden">
+              <div id="file-icon-preview" class="w-8 h-8 rounded bg-white flex items-center justify-center text-blue-600 font-bold text-xs shadow-xs">
+                <i class="fa-solid fa-file"></i>
+              </div>
+              <div class="overflow-hidden">
+                <p id="file-name-label" class="font-medium text-slate-800 truncate text-xs">filename.png</p>
+                <a id="file-link-tag" href="#" target="_blank" class="text-[10px] text-blue-600 hover:underline">คลิกเพื่อเปิดดูไฟล์</a>
+              </div>
+            </div>
+            <button type="button" id="btn-remove-file" class="text-rose-500 hover:text-rose-700 p-1 text-xs">
+              <i class="fa-solid fa-trash-can"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Form Actions -->
+        <div class="pt-4 border-t border-slate-100 flex items-center justify-end gap-2">
+          <button type="button" id="btn-cancel-task" class="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-100 font-medium transition text-xs">
+            ยกเลิก
+          </button>
+          <button type="submit" id="btn-submit-task" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold shadow-sm shadow-blue-500/20 transition text-xs flex items-center gap-1.5">
+            <span id="submit-btn-text">บันทึกข้อมูล</span>
+            <i id="submit-btn-spinner" class="fa-solid fa-circle-notch fa-spin hidden"></i>
+          </button>
+        </div>
+
+      </form>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- MODAL: TASK DETAIL VIEW (Quick Read / Details) -->
+  <!-- ========================================================================= -->
+  <div id="detail-modal" style="display: none;" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm modal-overlay">
+    <div class="bg-white rounded-2xl shadow-2xl border border-slate-100 w-full max-w-lg overflow-hidden modal-content max-h-[90vh] flex flex-col">
+      <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+        <span id="detail-status-badge" class="px-2.5 py-1 rounded-full text-xs font-semibold">Status</span>
+        <button id="btn-close-detail-modal" class="text-slate-400 hover:text-slate-600 text-lg transition">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="p-6 space-y-4 overflow-y-auto flex-1 text-xs">
+        <div>
+          <div class="flex items-center gap-2 mb-1">
+            <span id="detail-priority-badge" class="text-[10px] font-semibold px-2 py-0.5 rounded">Priority</span>
+            <span id="detail-deadline-alert" class="text-[10px] font-medium px-2 py-0.5 rounded">Deadline</span>
+          </div>
+          <h2 id="detail-title" class="text-base font-bold text-slate-900 leading-snug">ชื่องาน</h2>
+        </div>
+
+        <div>
+          <label class="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">รายละเอียด</label>
+          <p id="detail-description" class="text-slate-700 whitespace-pre-line bg-slate-50 p-3 rounded-xl border border-slate-100 leading-relaxed">
+            ไม่มีรายละเอียด
+          </p>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3 py-2 border-y border-slate-100">
+          <div>
+            <label class="block text-[11px] text-slate-400 mb-0.5">ผู้รับผิดชอบ</label>
+            <div class="flex items-center gap-2 mt-1">
+              <div id="detail-assignee-avatar" class="w-6 h-6 rounded-md bg-blue-600 text-white font-bold text-[10px] flex items-center justify-center"></div>
+              <span id="detail-assignee" class="font-semibold text-slate-800">ชื่อ</span>
+            </div>
+          </div>
+          <div>
+            <label class="block text-[11px] text-slate-400 mb-0.5">ผู้มอบหมาย/สร้างงาน</label>
+            <span id="detail-createdby" class="font-medium text-slate-700 block mt-1">ชื่อ</span>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-[11px] text-slate-400 mb-0.5">วันที่เริ่ม</label>
+            <span id="detail-startdate" class="font-medium text-slate-800">-</span>
+          </div>
+          <div>
+            <label class="block text-[11px] text-slate-400 mb-0.5">วันกำหนดส่ง (Deadline)</label>
+            <span id="detail-deadline" class="font-semibold text-slate-800">-</span>
+          </div>
+        </div>
+
+        <!-- Attachment Section -->
+        <div id="detail-attachment-box" style="display: none;" class="hidden">
+          <label class="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">ไฟล์แนบ</label>
+          <div id="detail-attachment-content" class="bg-slate-50 p-3 rounded-xl border border-slate-200">
+            <!-- Injected image or file button -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Detail Modal Footer Actions -->
+      <div id="detail-modal-footer" class="px-6 py-3 border-t border-slate-100 bg-slate-50 flex items-center justify-between">
+        <button id="btn-detail-delete" class="text-rose-600 hover:text-rose-800 font-medium text-xs flex items-center gap-1">
+          <i class="fa-solid fa-trash-can"></i> ลบงานนี้
+        </button>
+        <button id="btn-detail-edit" class="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium text-xs shadow-sm transition flex items-center gap-1">
+          <i class="fa-solid fa-pen"></i> แก้ไขงาน
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- MODAL: GOOGLE SHEETS / DRIVE SETTINGS -->
+  <!-- ========================================================================= -->
+  <div id="settings-modal" style="display: none;" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm modal-overlay">
+    <div class="bg-white rounded-2xl shadow-2xl border border-slate-100 w-full max-w-xl overflow-hidden modal-content max-h-[90vh] flex flex-col">
+      <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold">
+            <i class="fa-solid fa-cloud"></i>
+          </div>
+          <div>
+            <h3 class="font-bold text-slate-900 text-sm">การเชื่อมต่อ Google Sheets & Drive</h3>
+            <p class="text-[11px] text-slate-500">กำหนด URL ของ Google Apps Script Web App</p>
+          </div>
+        </div>
+        <button id="btn-close-settings-modal" class="text-slate-400 hover:text-slate-600 text-lg transition">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="p-6 space-y-4 overflow-y-auto flex-1 text-xs">
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">
+            Google Apps Script Web App URL:
+          </label>
+          <div class="flex gap-2">
+            <input type="url" id="setting-api-url" placeholder="https://script.google.com/macros/s/.../exec"
+              class="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-xs focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500">
+            <button id="btn-test-connection" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-lg border border-slate-200 transition whitespace-nowrap">
+              ทดสอบการเชื่อมต่อ
+            </button>
+          </div>
+          <div id="connection-status-msg" style="display: none;" class="hidden mt-2 p-2 rounded-lg text-[11px]"></div>
+          <p class="text-[11px] text-slate-400 mt-1">
+            * หากเว้นว่างไว้ ระบบจะทำงานในโหมดทดลอง (Mock Data) ในเครื่องของคุณ
+          </p>
+        </div>
+
+        <!-- Setup Instructions Accordion -->
+        <div class="bg-blue-50/70 border border-blue-200 rounded-xl p-4 text-slate-700 space-y-2">
+          <h4 class="font-bold text-blue-900 flex items-center gap-1.5 text-xs">
+            <i class="fa-solid fa-circle-info text-blue-600"></i> ขั้นตอนการติดตั้ง Google Apps Script (ทำครั้งเดียว):
+          </h4>
+          <ol class="list-decimal list-inside space-y-1 text-[11px] text-slate-600 leading-relaxed">
+            <li>เปิด Google Sheets ใหม่ที่ <a href="https://sheets.new" target="_blank" class="text-blue-600 underline font-semibold">sheets.new</a></li>
+            <li>ไปที่เมนู <b>ส่วนขยาย (Extensions)</b> > <b>Apps Script</b></li>
+            <li>คัดลอกโค้ดจากไฟล์ <code class="bg-white px-1 py-0.5 rounded border border-slate-200 font-mono text-blue-700">google-apps-script/Code.gs</code> ไปวางแทนที่ทั้งหมด</li>
+            <li>กดบันทึก แล้วกดปุ่ม <b>ทำให้ใช้งานได้ (Deploy)</b> > <b>การทำให้ใช้งานได้ใหม่ (New deployment)</b></li>
+            <li>เลือกประเภท <b>เว็บแอป (Web app)</b>, ตั้งค่า <b>ผู้ที่มีสิทธิ์เข้าถึง (Who has access)</b> เป็น <b>"ทุกคน (Anyone)"</b></li>
+            <li>กด Deploy แล้วคัดลอก URL ที่ได้มาใส่ในช่องด้านบนนี้</li>
+          </ol>
+        </div>
+
+        <!-- Reset Local Storage -->
+        <div class="pt-3 border-t border-slate-100 flex items-center justify-between">
+          <span class="text-slate-500 text-[11px]">ต้องการล้างข้อมูลทดลองในเครื่อง?</span>
+          <button id="btn-reset-mock-data" class="text-rose-600 hover:text-rose-800 text-[11px] font-semibold">
+            <i class="fa-solid fa-rotate-left mr-1"></i> รีเซ็ตข้อมูลทดลองเริ่มต้น
+          </button>
+        </div>
+      </div>
+
+      <div class="px-6 py-3 border-t border-slate-100 bg-slate-50 flex items-center justify-end gap-2">
+        <button id="btn-save-settings" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold text-xs transition">
+          บันทึกการตั้งค่า
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Application Logic Modules -->
+  <script src="js/api.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
