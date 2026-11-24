@@ -61,8 +61,14 @@
         </div>
 
         <!-- Right Controls: Settings & User Switcher -->
-        <div class="flex items-center space-x-3">
+        <div class="flex items-center space-x-2 sm:space-x-3">
           
+          <!-- Live Auto-Sync / Manual Refresh Button -->
+          <button id="btn-refresh-data" onclick="window.TodoApp && window.TodoApp.refreshData(true)" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-100 rounded-lg transition-colors border border-slate-300 shadow-xs cursor-pointer" title="คลิกเพื่อดึงข้อมูลล่าสุดจาก Google Sheet ทันที (หรือระบบจะดึงให้อัตโนมัติทุก 15 วินาที)">
+            <i id="refresh-icon" class="fa-solid fa-arrows-rotate text-blue-600 transition-transform"></i>
+            <span id="sync-time-label" class="text-[11px] font-medium hidden sm:inline">รีเฟรช</span>
+          </button>
+
           <!-- Connect Google Sheet Button -->
           <button id="btn-open-settings" onclick="window.TodoApp && window.TodoApp.openSettingsModal()" class="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors border border-slate-300 shadow-xs cursor-pointer">
             <i class="fa-solid fa-cloud text-blue-600"></i>

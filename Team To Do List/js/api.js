@@ -48,7 +48,7 @@
   const LOCAL_MEMBERS_KEY = 'team_todo_local_members';
 
   // สามารถนำ Web App URL มาใส่ตรงนี้ได้โดยตรง (หรือจะกดใส่ผ่านปุ่มหน้าเว็บก็ได้)
-  const DEFAULT_API_URL = 'https://script.google.com/macros/s/AKfycbwVCoaAw2YaBgwQI0z7X3GR3ihvg9GzHzN_8UGstR6bT6FC4vA70yBy_1SHsHpXC0N2Tw/exec';
+  const DEFAULT_API_URL = '';
 
   // รายชื่อสมาชิกเริ่มต้น
   const INITIAL_MEMBERS = [
@@ -307,8 +307,9 @@
       if (!url) throw new Error('กรุณาระบุ URL ของ Google Apps Script');
 
       try {
-        const response = await fetch(`${url}?action=getAll`, {
+        const response = await fetch(`${url}?action=getAll&_t=${Date.now()}`, {
           method: 'GET',
+          cache: 'no-store',
           headers: { 'Accept': 'application/json' }
         });
         if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
@@ -326,7 +327,9 @@
     async fetchInitialData() {
       if (this.isLiveMode()) {
         try {
-          const response = await fetch(`${this.apiUrl}?action=getAll`);
+          const response = await fetch(`${this.apiUrl}?action=getAll&_t=${Date.now()}`, {
+            cache: 'no-store'
+          });
           const json = await response.json();
           if (json.success && json.data) {
             if (json.data.members && json.data.members.length > 0) {

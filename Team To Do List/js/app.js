@@ -31,12 +31,17 @@
   };
 
   // =========================================================================
-  // Initialization
+  // Initialization & Real-Time Sync
   // =========================================================================
+
+  let isRefreshing = false;
+  let autoSyncTimer = null;
 
   function initApp() {
     setupEventListeners();
-    loadData();
+    loadData().then(() => {
+      startAutoSync();
+    });
   }
 
   if (document.readyState === 'loading') {
@@ -66,12 +71,87 @@
       }
 
       renderAll();
+
+      const now = new Date();
+      const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+      const syncTimeLabel = document.getElementById('sync-time-label');
+      if (syncTimeLabel) syncTimeLabel.textContent = `ซิงค์ ${timeStr}`;
     } catch (err) {
       console.error('Failed to load initial data:', err);
       state.members = INITIAL_MEMBERS;
       state.currentUser = state.members[0];
       renderAll();
     }
+  }
+
+  /**
+   * ดึงข้อมูลล่าสุดจาก Google Sheets แบบ Real-time
+   * สามารถเรียกได้ทั้งแบบอัตโนมัติ (Background Polling) และกดปุ่มรีเฟรชเอง
+   */
+  async function refreshData(isManual = false) {
+    if (isRefreshing) return;
+
+    // หากเป็นการดึงข้อมูลอัตโนมัติในเบื้องหลัง แล้วผู้ใช้กำลังพิมพ์แบบฟอร์มหรือลากการ์ดอยู่ ให้พักไว้ก่อน
+    if (!isManual) {
+      const taskModal = document.getElementById('task-modal');
+      const isModalVisible = taskModal && taskModal.style.display !== 'none' && !taskModal.classList.contains('hidden');
+      if (isModalVisible || state.editingTaskId || draggedTaskId) {
+        return;
+      }
+    }
+
+    const refreshIcon = document.getElementById('refresh-icon');
+    const syncTimeLabel = document.getElementById('sync-time-label');
+
+    if (refreshIcon) {
+      refreshIcon.classList.add('fa-spin');
+    }
+
+    isRefreshing = true;
+
+    try {
+      const data = await api.fetchInitialData();
+      if (data && data.tasks) {
+        // เปรียบเทียบข้อมูลใหม่กับข้อมูลเดิม
+        const oldStateStr = JSON.stringify(state.tasks.map(t => `${t.id}:${t.status}:${t.updatedAt || ''}:${(t.attachments || []).length}`));
+        const newStateStr = JSON.stringify(data.tasks.map(t => `${t.id}:${t.status}:${t.updatedAt || ''}:${(t.attachments || []).length}`));
+
+        state.tasks = data.tasks;
+        if (data.members && data.members.length > 0) {
+          state.members = data.members;
+        }
+
+        // หากข้อมูลมีการเปลี่ยนแปลง หรือเป็นการกดรีเฟรชเอง ให้อัปเดตหน้าจอทันที
+        if (oldStateStr !== newStateStr || isManual) {
+          renderKanbanBoard();
+          renderTableView();
+          renderDashboard();
+        }
+
+        const now = new Date();
+        const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+        if (syncTimeLabel) {
+          syncTimeLabel.textContent = `ซิงค์ ${timeStr}`;
+        }
+      }
+    } catch (err) {
+      console.warn('Auto-refresh data failed:', err);
+    } finally {
+      isRefreshing = false;
+      if (refreshIcon) {
+        setTimeout(() => refreshIcon.classList.remove('fa-spin'), 400);
+      }
+    }
+  }
+
+  /**
+   * เริ่มการซิงค์ข้อมูลอัตโนมัติทุกๆ 12 วินาที (Auto-Polling)
+   */
+  function startAutoSync() {
+    if (autoSyncTimer) clearInterval(autoSyncTimer);
+    autoSyncTimer = setInterval(() => {
+      refreshData(false);
+    }, 12000);
   }
 
   // =========================================================================
@@ -1527,6 +1607,17 @@
         };
       }
     });
+
+    // ซิงค์ข้อมูลอัตโนมัติทันทีเมื่อผู้ใช้สลับกลับมาที่แท็บของหน้านี้
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        refreshData(false);
+      }
+    });
+
+    window.addEventListener('focus', () => {
+      refreshData(false);
+    });
   }
 
   // Export to Global window.TodoApp
@@ -1540,6 +1631,7 @@
     switchUser,
     toggleUserMenu,
     handleImgError,
+    refreshData,
     state
   };
 
