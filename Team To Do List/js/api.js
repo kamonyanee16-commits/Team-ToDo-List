@@ -48,7 +48,7 @@
   const LOCAL_MEMBERS_KEY = 'team_todo_local_members';
 
   // สามารถนำ Web App URL มาใส่ตรงนี้ได้โดยตรง (หรือจะกดใส่ผ่านปุ่มหน้าเว็บก็ได้)
-  const DEFAULT_API_URL = 'https://script.google.com/macros/s/AKfycbwVCoaAw2YaBgwQI0z7X3GR3ihvg9GzHzN_8UGstR6bT6FC4vA70yBy_1SHsHpXC0N2Tw/exec';
+  const DEFAULT_API_URL = (typeof window !== 'undefined' && window.GLOBAL_DEFAULT_API_URL) ? window.GLOBAL_DEFAULT_API_URL : 'https://script.google.com/macros/s/AKfycbwVCoaAw2YaBgwQI0z7X3GR3ihvg9GzHzN_8UGstR6bT6FC4vA70yBy_1SHsHpXC0N2Tw/exec';
 
   // รายชื่อสมาชิกเริ่มต้น
   const INITIAL_MEMBERS = [
@@ -272,7 +272,8 @@
 
   class TodoApi {
     constructor() {
-      this.apiUrl = safeStorage.getItem(API_CONFIG_KEY) || DEFAULT_API_URL || '';
+      const stored = safeStorage.getItem(API_CONFIG_KEY);
+      this.apiUrl = (stored && stored.trim()) ? stored.trim() : DEFAULT_API_URL;
       this.initLocalData();
     }
 
