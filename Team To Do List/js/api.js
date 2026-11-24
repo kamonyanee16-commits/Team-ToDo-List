@@ -89,6 +89,14 @@
       fileUrl: 'https://images.unsplash.com/photo-1507238691740-187a5b1d37b8?auto=format&fit=crop&w=600&q=80',
       fileName: 'ui_mockup_preview.png',
       fileType: 'image/png',
+      attachments: [
+        {
+          name: 'ui_mockup_preview.png',
+          url: 'https://images.unsplash.com/photo-1507238691740-187a5b1d37b8?auto=format&fit=crop&w=600&q=80',
+          directViewUrl: 'https://images.unsplash.com/photo-1507238691740-187a5b1d37b8?auto=format&fit=crop&w=600&q=80',
+          type: 'image/png'
+        }
+      ],
       createdAt: new Date().toISOString()
     },
     {
@@ -221,6 +229,47 @@
     });
   }
 
+  /**
+   * ปรับโครงสร้างข้อมูลงานให้มี attachments เป็น Array เสมอ เพื่อความเข้ากันได้
+   */
+  function normalizeTask(task) {
+    if (!task) return task;
+    let attachments = Array.isArray(task.attachments) ? [...task.attachments] : [];
+    
+    if (attachments.length === 0 && task.fileUrl) {
+      const trimmed = String(task.fileUrl).trim();
+      if (trimmed.startsWith('[')) {
+        try {
+          const parsed = JSON.parse(trimmed);
+          if (Array.isArray(parsed)) attachments = parsed;
+        } catch (e) {
+          attachments = [{
+            name: task.fileName || 'ไฟล์แนบ',
+            url: task.fileUrl,
+            directViewUrl: task.fileUrl,
+            type: task.fileType || ''
+          }];
+        }
+      } else {
+        attachments = [{
+          name: task.fileName || 'ไฟล์แนบ',
+          url: task.fileUrl,
+          directViewUrl: task.directViewUrl || task.fileUrl,
+          type: task.fileType || ''
+        }];
+      }
+    }
+
+    const first = attachments[0] || {};
+    return {
+      ...task,
+      attachments: attachments,
+      fileUrl: first.url || task.fileUrl || '',
+      fileName: first.name || task.fileName || '',
+      fileType: first.type || task.fileType || ''
+    };
+  }
+
   class TodoApi {
     constructor() {
       this.apiUrl = safeStorage.getItem(API_CONFIG_KEY) || DEFAULT_API_URL || '';
@@ -283,12 +332,11 @@
             if (json.data.members && json.data.members.length > 0) {
               safeStorage.setItem(LOCAL_MEMBERS_KEY, JSON.stringify(json.data.members));
             }
-            if (json.data.tasks) {
-              safeStorage.setItem(LOCAL_TASKS_KEY, JSON.stringify(json.data.tasks));
-            }
+            const normalizedTasks = (json.data.tasks || []).map(normalizeTask);
+            safeStorage.setItem(LOCAL_TASKS_KEY, JSON.stringify(normalizedTasks));
             return {
               members: json.data.members && json.data.members.length ? json.data.members : INITIAL_MEMBERS,
-              tasks: json.data.tasks || []
+              tasks: normalizedTasks
             };
           }
         } catch (err) {
@@ -311,10 +359,12 @@
         tasks = INITIAL_MOCK_TASKS;
       }
 
-      return { members, tasks };
+      return { members, tasks: (tasks || []).map(normalizeTask) };
     }
 
     async createTask(taskData) {
+      const cleanTask = normalizeTask(taskData);
+
       if (this.isLiveMode()) {
         try {
           const response = await fetch(this.apiUrl, {
@@ -322,12 +372,12 @@
             headers: { 'Content-Type': 'text/plain;charset=utf-8' },
             body: JSON.stringify({
               action: 'createTask',
-              task: taskData
+              task: cleanTask
             })
           });
           const json = await response.json();
           if (json.success) {
-            return json.data;
+            return normalizeTask(json.data);
           }
         } catch (err) {
           console.error('Live createTask failed:', err);
@@ -340,18 +390,20 @@
         if (stored) tasks = JSON.parse(stored);
       } catch (e) {}
 
-      const newTask = {
-        ...taskData,
+      const newTask = normalizeTask({
+        ...cleanTask,
         id: 'task_' + Date.now(),
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
-      };
+      });
       tasks.unshift(newTask);
       safeStorage.setItem(LOCAL_TASKS_KEY, JSON.stringify(tasks));
       return newTask;
     }
 
     async updateTask(taskData) {
+      const cleanTask = normalizeTask(taskData);
+
       if (this.isLiveMode()) {
         try {
           const response = await fetch(this.apiUrl, {
@@ -359,7 +411,7 @@
             headers: { 'Content-Type': 'text/plain;charset=utf-8' },
             body: JSON.stringify({
               action: 'updateTask',
-              task: taskData
+              task: cleanTask
             })
           });
           const json = await response.json();
@@ -375,9 +427,13 @@
         if (stored) tasks = JSON.parse(stored);
       } catch (e) {}
 
-      const index = tasks.findIndex(t => t.id === taskData.id);
+      const index = tasks.findIndex(t => t.id === cleanTask.id);
       if (index !== -1) {
-        tasks[index] = { ...tasks[index], ...taskData, updatedAt: new Date().toISOString() };
+        tasks[index] = normalizeTask({
+          ...tasks[index],
+          ...cleanTask,
+          updatedAt: new Date().toISOString()
+        });
         safeStorage.setItem(LOCAL_TASKS_KEY, JSON.stringify(tasks));
         return true;
       }
@@ -503,6 +559,30 @@
         reader.onerror = error => reject(error);
         reader.readAsDataURL(processedFile);
       });
+    }
+
+    /**
+     * อัปโหลดไฟล์แนบหลายไฟล์พร้อมกัน
+     */
+    async uploadMultipleFiles(files, progressCallback) {
+      if (!files || files.length === 0) return [];
+      const results = [];
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        if (progressCallback) progressCallback(i + 1, files.length, file.name);
+        try {
+          const res = await this.uploadFile(file);
+          results.push({
+            name: res.fileName,
+            url: res.fileUrl,
+            directViewUrl: res.directViewUrl || res.fileUrl,
+            type: res.fileType
+          });
+        } catch (err) {
+          console.error('Failed to upload file:', file.name, err);
+        }
+      }
+      return results;
     }
 
     resetLocalData() {

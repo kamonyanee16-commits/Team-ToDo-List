@@ -25,6 +25,7 @@
     searchQuery: '',
     priorityFilter: 'all',
     editingTaskId: null,
+    modalAttachments: [], // [{ name, type, sizeStr, previewUrl, file, url, directViewUrl, isNew }]
     selectedFile: null,
     isUploading: false
   };
@@ -356,26 +357,42 @@
 
     const deadlineInfo = formatDeadline(task.deadline, task.status === 'Done');
 
+    const atts = (Array.isArray(task.attachments) && task.attachments.length > 0)
+      ? task.attachments
+      : (task.fileUrl ? [{ name: task.fileName || 'ไฟล์แนบ', url: task.fileUrl, directViewUrl: task.directViewUrl || task.fileUrl, type: task.fileType || '' }] : []);
+
     let attachmentHtml = '';
-    if (task.fileUrl) {
-      const isImg = isImageFile(task.fileType, task.fileName, task.fileUrl);
-      if (isImg) {
-        const displayUrl = getDisplayableImageUrl(task.fileUrl);
+    if (atts.length > 0) {
+      const firstImg = atts.find(a => isImageFile(a.type, a.name, a.url));
+      if (firstImg) {
+        const displayUrl = getDisplayableImageUrl(firstImg.url);
         attachmentHtml = `
-          <div class="mt-2 rounded-lg overflow-hidden border border-slate-200 max-h-32 bg-slate-100 flex items-center justify-center">
+          <div class="mt-2 relative rounded-lg overflow-hidden border border-slate-200 max-h-32 bg-slate-100 flex items-center justify-center">
             <img src="${displayUrl}" 
-                 alt="${escapeHtml(task.fileName || 'ไฟล์แนบ')}" 
+                 alt="${escapeHtml(firstImg.name || 'ไฟล์แนบ')}" 
                  referrerpolicy="no-referrer" 
                  loading="lazy"
-                 onerror="window.TodoApp && window.TodoApp.handleImgError(this, '${escapeHtml(task.fileUrl)}', '${escapeHtml(task.fileName || 'ไฟล์ภาพ')}')"
+                 onerror="window.TodoApp && window.TodoApp.handleImgError(this, '${escapeHtml(firstImg.url)}', '${escapeHtml(firstImg.name || 'ไฟล์ภาพ')}')"
                  class="w-full h-full object-cover max-h-32 hover:scale-105 transition duration-200">
+            ${atts.length > 1 ? `
+              <span class="absolute bottom-1.5 right-1.5 bg-slate-900/80 backdrop-blur-xs text-white text-[10px] font-medium px-2 py-0.5 rounded-md flex items-center gap-1 shadow-sm">
+                <i class="fa-solid fa-layer-group text-[9px]"></i> +${atts.length - 1} ไฟล์
+              </span>
+            ` : ''}
           </div>
         `;
       } else {
         attachmentHtml = `
-          <div class="mt-1.5 flex items-center gap-1.5 text-[11px] text-blue-600 bg-blue-50/70 px-2 py-1 rounded-md border border-blue-100 truncate">
-            <i class="fa-solid fa-paperclip text-xs"></i>
-            <span class="truncate">${escapeHtml(task.fileName || 'ดูไฟล์แนบ')}</span>
+          <div class="mt-1.5 flex items-center justify-between text-[11px] text-blue-600 bg-blue-50/70 px-2.5 py-1.5 rounded-lg border border-blue-100">
+            <div class="flex items-center gap-1.5 truncate min-w-0">
+              <i class="fa-solid fa-paperclip text-xs shrink-0"></i>
+              <span class="truncate font-medium text-slate-700">${escapeHtml(atts[0].name || 'ดูไฟล์แนบ')}</span>
+            </div>
+            ${atts.length > 1 ? `
+              <span class="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.2 rounded font-semibold shrink-0 ml-1">
+                +${atts.length - 1}
+              </span>
+            ` : ''}
           </div>
         `;
       }
@@ -463,6 +480,17 @@
       if (task.status === 'On Hold') statusClass = 'bg-slate-100 text-slate-700 border border-slate-200';
       if (task.status === 'Done') statusClass = 'bg-emerald-50 text-emerald-700 border border-emerald-200';
 
+      const tAtts = (Array.isArray(task.attachments) && task.attachments.length > 0)
+        ? task.attachments
+        : (task.fileUrl ? [{ name: task.fileName || 'ไฟล์แนบ', url: task.fileUrl, directViewUrl: task.directViewUrl || task.fileUrl }] : []);
+
+      let tableAttachHtml = '<span class="text-slate-300">-</span>';
+      if (tAtts.length === 1) {
+        tableAttachHtml = `<a href="${escapeHtml(tAtts[0].directViewUrl || tAtts[0].url)}" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline flex items-center gap-1 text-xs truncate max-w-[140px]" title="${escapeHtml(tAtts[0].name || 'ไฟล์แนบ')}"><i class="fa-solid fa-paperclip"></i> <span class="truncate">${escapeHtml(tAtts[0].name || 'ไฟล์แนบ')}</span></a>`;
+      } else if (tAtts.length > 1) {
+        tableAttachHtml = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-200 cursor-pointer hover:bg-blue-100 transition"><i class="fa-solid fa-paperclip"></i> ${tAtts.length} ไฟล์</span>`;
+      }
+
       tr.innerHTML = `
         <td class="py-3 px-4">
           <p class="font-semibold text-slate-900">${escapeHtml(task.title)}</p>
@@ -484,7 +512,7 @@
           ${deadlineInfo.badge}
         </td>
         <td class="py-3 px-4 whitespace-nowrap">
-          ${task.fileUrl ? `<a href="${task.fileUrl}" target="_blank" class="text-blue-600 hover:underline flex items-center gap-1"><i class="fa-solid fa-paperclip"></i> ไฟล์แนบ</a>` : '<span class="text-slate-300">-</span>'}
+          ${tableAttachHtml}
         </td>
         <td class="py-3 px-4 text-center whitespace-nowrap">
           <div class="inline-flex items-center gap-2">
@@ -588,16 +616,133 @@
   // Modal: Add / Edit Task
   // =========================================================================
 
+  function getFileIconHtml(name, type) {
+    const ext = (name || '').split('.').pop().toLowerCase();
+    const mime = (type || '').toLowerCase();
+    if (mime.startsWith('image/') || ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'].includes(ext)) {
+      return '<i class="fa-solid fa-image text-blue-500"></i>';
+    }
+    if (ext === 'pdf' || mime.includes('pdf')) {
+      return '<i class="fa-solid fa-file-pdf text-rose-500"></i>';
+    }
+    if (['doc', 'docx'].includes(ext) || mime.includes('word') || mime.includes('officedocument.wordprocessingml')) {
+      return '<i class="fa-solid fa-file-word text-blue-600"></i>';
+    }
+    if (['xls', 'xlsx', 'csv'].includes(ext) || mime.includes('excel') || mime.includes('spreadsheet')) {
+      return '<i class="fa-solid fa-file-excel text-emerald-600"></i>';
+    }
+    if (['zip', 'rar', '7z', 'tar', 'gz'].includes(ext) || mime.includes('zip') || mime.includes('compressed')) {
+      return '<i class="fa-solid fa-file-zipper text-amber-500"></i>';
+    }
+    return '<i class="fa-solid fa-file-lines text-slate-500"></i>';
+  }
+
+  function renderModalAttachmentsList() {
+    const container = document.getElementById('attachments-list-container');
+    const counter = document.getElementById('form-attachment-counter');
+    if (!container) return;
+
+    const count = state.modalAttachments.length;
+    if (counter) counter.textContent = `${count} ไฟล์`;
+
+    if (count === 0) {
+      container.innerHTML = '';
+      return;
+    }
+
+    container.innerHTML = state.modalAttachments.map((att, idx) => {
+      const isImg = isImageFile(att.type, att.name, att.previewUrl || att.url);
+      const displayUrl = att.previewUrl || getDisplayableImageUrl(att.url);
+
+      let thumbHtml = '';
+      if (isImg && displayUrl) {
+        thumbHtml = `
+          <div class="w-9 h-9 rounded-lg overflow-hidden border border-slate-200 shrink-0 bg-slate-100 flex items-center justify-center">
+            <img src="${displayUrl}" 
+                 alt="${escapeHtml(att.name)}" 
+                 referrerpolicy="no-referrer"
+                 onerror="this.src=''; this.parentElement.innerHTML='<i class=\\'fa-solid fa-image text-blue-500 text-sm\\'></i>';"
+                 class="w-full h-full object-cover">
+          </div>
+        `;
+      } else {
+        thumbHtml = `
+          <div class="w-9 h-9 rounded-lg bg-slate-100 text-slate-600 border border-slate-200 shrink-0 flex items-center justify-center text-sm">
+            ${getFileIconHtml(att.name, att.type)}
+          </div>
+        `;
+      }
+
+      const statusBadge = att.isNew 
+        ? `<span class="text-[10px] text-blue-600 bg-blue-50 px-1.5 py-0.2 rounded font-medium">รออัปโหลด ${att.sizeStr ? `• ${att.sizeStr}` : ''}</span>`
+        : `<span class="text-[10px] text-slate-400 bg-slate-100 px-1.5 py-0.2 rounded">ไฟล์เดิม</span>`;
+
+      return `
+        <div class="flex items-center justify-between p-2 rounded-xl bg-slate-50 border border-slate-200 hover:bg-slate-100/70 transition gap-2 group">
+          <div class="flex items-center gap-2 overflow-hidden min-w-0">
+            ${thumbHtml}
+            <div class="overflow-hidden min-w-0">
+              <p class="font-medium text-slate-800 text-xs truncate" title="${escapeHtml(att.name)}">${escapeHtml(att.name)}</p>
+              <div>${statusBadge}</div>
+            </div>
+          </div>
+          <button type="button" 
+                  class="btn-delete-modal-att p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition shrink-0 cursor-pointer" 
+                  data-index="${idx}" 
+                  title="ลบไฟล์นี้">
+            <i class="fa-solid fa-trash-can text-xs"></i>
+          </button>
+        </div>
+      `;
+    }).join('');
+
+    container.querySelectorAll('.btn-delete-modal-att').forEach(btn => {
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        const index = parseInt(btn.dataset.index, 10);
+        if (!isNaN(index) && index >= 0 && index < state.modalAttachments.length) {
+          state.modalAttachments.splice(index, 1);
+          renderModalAttachmentsList();
+        }
+      };
+    });
+  }
+
+  function addFilesToModal(filesList) {
+    if (!filesList || filesList.length === 0) return;
+    for (let i = 0; i < filesList.length; i++) {
+      const file = filesList[i];
+      const sizeKb = Math.round(file.size / 1024);
+      const sizeStr = sizeKb > 1024 ? `${(sizeKb / 1024).toFixed(1)} MB` : `${sizeKb} KB`;
+      let previewUrl = '';
+      if (file.type && file.type.startsWith('image/')) {
+        try {
+          previewUrl = URL.createObjectURL(file);
+        } catch (e) {
+          previewUrl = '';
+        }
+      }
+      state.modalAttachments.push({
+        name: file.name,
+        type: file.type,
+        file: file,
+        sizeStr: sizeStr,
+        previewUrl: previewUrl,
+        isNew: true
+      });
+    }
+    renderModalAttachmentsList();
+  }
+
   function openTaskModal(task = null) {
     const modal = document.getElementById('task-modal');
     const titleEl = document.getElementById('modal-task-title');
     const form = document.getElementById('task-form');
     const assigneeSelect = document.getElementById('form-assignee');
     const assigneeHint = document.getElementById('form-assignee-hint');
-    const fileContainer = document.getElementById('file-preview-container');
 
     state.editingTaskId = task ? task.id : null;
-    state.selectedFile = null;
+    state.modalAttachments = [];
 
     if (assigneeSelect) {
       assigneeSelect.innerHTML = '';
@@ -618,10 +763,6 @@
       }
     }
 
-    if (fileContainer) {
-      fileContainer.style.display = 'none';
-      fileContainer.classList.add('hidden');
-    }
     const fileInput = document.getElementById('form-file-input');
     if (fileInput) fileInput.value = '';
 
@@ -636,9 +777,17 @@
       document.getElementById('form-start-date').value = task.startDate || '';
       document.getElementById('form-deadline').value = task.deadline || '';
 
-      if (task.fileUrl) {
-        showFilePreviewInForm(task.fileName || 'ไฟล์แนบ', task.fileUrl, task.fileType);
-      }
+      const atts = (Array.isArray(task.attachments) && task.attachments.length > 0)
+        ? task.attachments
+        : (task.fileUrl ? [{ name: task.fileName || 'ไฟล์แนบ', url: task.fileUrl, directViewUrl: task.directViewUrl || task.fileUrl, type: task.fileType || '' }] : []);
+
+      state.modalAttachments = atts.map(a => ({
+        name: a.name || 'ไฟล์แนบ',
+        url: a.url || '',
+        directViewUrl: a.directViewUrl || a.url || '',
+        type: a.type || '',
+        isNew: false
+      }));
     } else {
       if (titleEl) titleEl.textContent = state.currentUser.role === 'manager' ? 'มอบหมายงานใหม่' : 'เพิ่มงานใหม่ของฉัน';
       if (form) form.reset();
@@ -657,6 +806,8 @@
       document.getElementById('form-start-date').value = new Date().toISOString().split('T')[0];
     }
 
+    renderModalAttachmentsList();
+
     if (modal) {
       modal.style.display = 'flex';
       modal.classList.remove('hidden');
@@ -670,29 +821,8 @@
       modal.classList.add('hidden');
     }
     state.editingTaskId = null;
-    state.selectedFile = null;
-  }
-
-  function showFilePreviewInForm(name, url, type, sizeStr = '') {
-    const container = document.getElementById('file-preview-container');
-    const label = document.getElementById('file-name-label');
-    const link = document.getElementById('file-link-tag');
-    const icon = document.getElementById('file-icon-preview');
-
-    if (container) {
-      container.style.display = 'flex';
-      container.classList.remove('hidden');
-    }
-    if (label) label.textContent = name + (sizeStr ? ` (${sizeStr})` : '');
-    if (link) link.href = url || '#';
-
-    if (icon) {
-      if (isImageFile(type, name, url)) {
-        icon.innerHTML = `<img src="${url}" class="w-full h-full object-cover rounded shadow-2xs">`;
-      } else {
-        icon.innerHTML = '<i class="fa-solid fa-file text-blue-600 text-sm"></i>';
-      }
-    }
+    state.modalAttachments = [];
+    renderModalAttachmentsList();
   }
 
   // =========================================================================
@@ -744,44 +874,82 @@
 
     const attachBox = document.getElementById('detail-attachment-box');
     const attachContent = document.getElementById('detail-attachment-content');
-    if (task.fileUrl && attachBox && attachContent) {
+    const attachCountEl = document.getElementById('detail-attachment-count');
+
+    const atts = (Array.isArray(task.attachments) && task.attachments.length > 0)
+      ? task.attachments
+      : (task.fileUrl ? [{ name: task.fileName || 'ไฟล์แนบ', url: task.fileUrl, directViewUrl: task.directViewUrl || task.fileUrl, type: task.fileType || '' }] : []);
+
+    if (atts.length > 0 && attachBox && attachContent) {
       attachBox.style.display = 'block';
       attachBox.classList.remove('hidden');
-      const isImg = isImageFile(task.fileType, task.fileName, task.fileUrl);
-      if (isImg) {
-        const displayUrl = getDisplayableImageUrl(task.fileUrl);
-        attachContent.innerHTML = `
-          <div class="block group">
-            <img src="${displayUrl}" 
-                 alt="${escapeHtml(task.fileName || 'ไฟล์แนบ')}" 
-                 referrerpolicy="no-referrer"
-                 onerror="window.TodoApp && window.TodoApp.handleImgError(this, '${escapeHtml(task.fileUrl)}', '${escapeHtml(task.fileName || 'ไฟล์ภาพ')}')"
-                 class="max-h-56 rounded-lg mx-auto object-cover border border-slate-200 shadow-xs cursor-pointer"
-                 onclick="window.open('${escapeHtml(task.fileUrl)}', '_blank', 'noopener,noreferrer')">
-            <p class="text-center text-[10px] text-blue-600 mt-1.5 group-hover:underline cursor-pointer"
-               onclick="window.open('${escapeHtml(task.fileUrl)}', '_blank', 'noopener,noreferrer')">
-              <i class="fa-solid fa-arrow-up-right-from-square mr-1"></i> คลิกเพื่อเปิดดูรูปขนาดเต็มใน Google Drive
-            </p>
-          </div>
-        `;
-      } else {
-        attachContent.innerHTML = `
-          <div class="flex items-center justify-between">
-            <div class="flex items-center gap-2">
-              <div class="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center font-bold">
-                <i class="fa-solid fa-file"></i>
-              </div>
-              <div>
-                <p class="font-semibold text-slate-800 text-xs">${escapeHtml(task.fileName || 'เอกสารแนบ')}</p>
-                <span class="text-[10px] text-slate-400">เก็บไว้บน Google Drive</span>
-              </div>
+      if (attachCountEl) attachCountEl.textContent = `${atts.length} ไฟล์`;
+
+      const images = atts.filter(a => isImageFile(a.type, a.name, a.url));
+      const docs = atts.filter(a => !isImageFile(a.type, a.name, a.url));
+
+      let imagesHtml = '';
+      if (images.length > 0) {
+        imagesHtml = `
+          <div class="space-y-1.5">
+            <span class="text-[10px] font-semibold text-slate-400 block uppercase tracking-wider">
+              <i class="fa-solid fa-images mr-1 text-blue-500"></i> รูปภาพ (${images.length})
+            </span>
+            <div class="grid ${images.length === 1 ? 'grid-cols-1' : 'grid-cols-2 sm:grid-cols-3'} gap-2">
+              ${images.map(img => {
+                const displayUrl = getDisplayableImageUrl(img.url);
+                return `
+                  <div class="group relative rounded-xl overflow-hidden border border-slate-200 bg-slate-100 aspect-video flex items-center justify-center cursor-pointer shadow-xs"
+                       onclick="window.open('${escapeHtml(img.directViewUrl || img.url)}', '_blank', 'noopener,noreferrer')">
+                    <img src="${displayUrl}" 
+                         alt="${escapeHtml(img.name || 'รูปภาพ')}" 
+                         referrerpolicy="no-referrer"
+                         loading="lazy"
+                         onerror="window.TodoApp && window.TodoApp.handleImgError(this, '${escapeHtml(img.url)}', '${escapeHtml(img.name || 'ไฟล์ภาพ')}')"
+                         class="w-full h-full object-cover group-hover:scale-105 transition duration-200">
+                    <div class="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs gap-1">
+                      <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                      <span>ดูขนาดเต็ม</span>
+                    </div>
+                  </div>
+                `;
+              }).join('')}
             </div>
-            <a href="${task.fileUrl}" target="_blank" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold shadow-xs transition flex items-center gap-1">
-              <i class="fa-solid fa-download"></i> ดาวน์โหลด / เปิดดู
-            </a>
           </div>
         `;
       }
+
+      let docsHtml = '';
+      if (docs.length > 0) {
+        docsHtml = `
+          <div class="space-y-1.5 ${images.length > 0 ? 'mt-3 pt-3 border-t border-slate-100' : ''}">
+            <span class="text-[10px] font-semibold text-slate-400 block uppercase tracking-wider">
+              <i class="fa-solid fa-file mr-1 text-slate-400"></i> เอกสาร / ไฟล์อื่นๆ (${docs.length})
+            </span>
+            <div class="space-y-1.5">
+              ${docs.map(doc => `
+                <div class="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-200 hover:bg-slate-100/80 transition gap-2">
+                  <div class="flex items-center gap-2 overflow-hidden min-w-0">
+                    <div class="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-xs shrink-0">
+                      ${getFileIconHtml(doc.name, doc.type)}
+                    </div>
+                    <div class="overflow-hidden min-w-0">
+                      <p class="font-semibold text-slate-800 text-xs truncate" title="${escapeHtml(doc.name || 'เอกสารแนบ')}">${escapeHtml(doc.name || 'เอกสารแนบ')}</p>
+                      <span class="text-[10px] text-slate-400">Google Drive</span>
+                    </div>
+                  </div>
+                  <a href="${escapeHtml(doc.directViewUrl || doc.url)}" target="_blank" rel="noopener noreferrer" 
+                     class="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[11px] font-semibold shadow-xs transition shrink-0 flex items-center gap-1">
+                    <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i> เปิดดู
+                  </a>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `;
+      }
+
+      attachContent.innerHTML = imagesHtml + docsHtml;
     } else if (attachBox) {
       attachBox.style.display = 'none';
       attachBox.classList.add('hidden');
@@ -1215,26 +1383,42 @@
         if (submitSpinner) submitSpinner.classList.remove('hidden');
 
         try {
-          let fileUrl = '';
-          let fileName = '';
-          let fileType = '';
+          const finalAttachments = [];
+          const newAtts = state.modalAttachments.filter(a => a.isNew && a.file);
+          
+          if (newAtts.length > 0) {
+            submitText.textContent = `กำลังอัปโหลดไฟล์ (0/${newAtts.length})...`;
+          }
 
-          if (state.selectedFile) {
-            submitText.textContent = 'กำลังอัปโหลดไฟล์...';
-            const uploadRes = await api.uploadFile(state.selectedFile);
-            fileUrl = uploadRes.fileUrl;
-            fileName = uploadRes.fileName;
-            fileType = uploadRes.fileType;
-          } else if (state.editingTaskId) {
-            const existing = state.tasks.find(t => t.id === state.editingTaskId);
-            const previewContainer = document.getElementById('file-preview-container');
-            const isContainerVisible = previewContainer && previewContainer.style.display !== 'none';
-            if (existing && isContainerVisible) {
-              fileUrl = existing.fileUrl || '';
-              fileName = existing.fileName || '';
-              fileType = existing.fileType || '';
+          let uploadedCount = 0;
+          for (let i = 0; i < state.modalAttachments.length; i++) {
+            const item = state.modalAttachments[i];
+            if (item.isNew && item.file) {
+              uploadedCount++;
+              submitText.textContent = `กำลังอัปโหลดไฟล์ (${uploadedCount}/${newAtts.length})...`;
+              const res = await api.uploadFile(item.file);
+              finalAttachments.push({
+                name: res.fileName || item.name,
+                url: res.fileUrl,
+                directViewUrl: res.directViewUrl || res.fileUrl,
+                type: res.fileType || item.type
+              });
+            } else if (item.url) {
+              finalAttachments.push({
+                name: item.name || 'ไฟล์แนบ',
+                url: item.url,
+                directViewUrl: item.directViewUrl || item.url,
+                type: item.type || ''
+              });
             }
           }
+
+          submitText.textContent = 'กำลังบันทึกข้อมูล...';
+
+          const firstAtt = finalAttachments[0] || {};
+          const fileUrl = firstAtt.url || '';
+          const fileName = firstAtt.name || '';
+          const fileType = firstAtt.type || '';
 
           if (state.editingTaskId) {
             const taskData = {
@@ -1248,7 +1432,8 @@
               deadline,
               fileUrl,
               fileName,
-              fileType
+              fileType,
+              attachments: finalAttachments
             };
 
             await api.updateTask(taskData);
@@ -1268,7 +1453,8 @@
               deadline,
               fileUrl,
               fileName,
-              fileType
+              fileType,
+              attachments: finalAttachments
             };
 
             const created = await api.createTask(newTaskData);
@@ -1291,15 +1477,6 @@
     const dropZone = document.getElementById('drop-zone');
     const fileInput = document.getElementById('form-file-input');
 
-    const handleSelectedFile = (file) => {
-      if (!file) return;
-      state.selectedFile = file;
-      const tempUrl = URL.createObjectURL(file);
-      const sizeKb = Math.round(file.size / 1024);
-      const sizeStr = sizeKb > 1024 ? `${(sizeKb / 1024).toFixed(1)} MB` : `${sizeKb} KB`;
-      showFilePreviewInForm(file.name, tempUrl, file.type, sizeStr);
-    };
-
     if (dropZone && fileInput) {
       dropZone.onclick = (e) => {
         if (e.target !== fileInput) {
@@ -1321,26 +1498,22 @@
         e.preventDefault();
         dropZone.classList.remove('border-blue-500', 'bg-blue-50/70');
         if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-          handleSelectedFile(e.dataTransfer.files[0]);
+          addFilesToModal(e.dataTransfer.files);
         }
       };
 
       fileInput.onchange = (e) => {
-        if (e.target.files && e.target.files[0]) {
-          handleSelectedFile(e.target.files[0]);
+        if (e.target.files && e.target.files.length > 0) {
+          addFilesToModal(e.target.files);
+          e.target.value = '';
         }
       };
     }
 
     bindClick('btn-remove-file', () => {
       state.selectedFile = null;
-      const finput = document.getElementById('form-file-input');
-      if (finput) finput.value = '';
-      const fprev = document.getElementById('file-preview-container');
-      if (fprev) {
-        fprev.style.display = 'none';
-        fprev.classList.add('hidden');
-      }
+      state.modalAttachments = [];
+      renderModalAttachmentsList();
     });
 
     ['task-modal', 'detail-modal', 'settings-modal'].forEach(id => {
