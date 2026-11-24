@@ -189,6 +189,35 @@ function getTasksData() {
   for (let i = 1; i < rows.length; i++) {
     const r = rows[i];
     if (r[0]) {
+      let rawFileUrl = r[9] ? String(r[9]) : '';
+      let rawFileName = r[10] ? String(r[10]) : '';
+      let rawFileType = r[11] ? String(r[11]) : '';
+      let attachments = [];
+
+      // รองรับไฟล์แนบหลายไฟล์ที่บันทึกเป็น JSON Array ในคอลัมน์ FileUrl
+      if (rawFileUrl && rawFileUrl.trim().startsWith('[')) {
+        try {
+          const parsed = JSON.parse(rawFileUrl);
+          if (Array.isArray(parsed)) {
+            attachments = parsed;
+          }
+        } catch (e) {
+          attachments = [];
+        }
+      }
+
+      // หากไม่ใช่ JSON แต่มี URL ไฟล์เดียว ให้แปลงเป็น Array อัตโนมัติ (Backward Compatibility)
+      if (attachments.length === 0 && rawFileUrl) {
+        attachments = [{
+          name: rawFileName || 'ไฟล์แนบ',
+          url: rawFileUrl,
+          directViewUrl: rawFileUrl,
+          type: rawFileType || ''
+        }];
+      }
+
+      const firstAtt = attachments.length > 0 ? attachments[0] : null;
+
       tasks.push({
         id: String(r[0]),
         title: r[1] || '',
@@ -199,9 +228,10 @@ function getTasksData() {
         deadline: formatSheetDate(r[6]),
         status: r[7] || 'To Do',
         priority: r[8] || 'Normal',
-        fileUrl: r[9] || '',
-        fileName: r[10] || '',
-        fileType: r[11] || '',
+        fileUrl: firstAtt ? (firstAtt.url || '') : rawFileUrl,
+        fileName: firstAtt ? (firstAtt.name || '') : rawFileName,
+        fileType: firstAtt ? (firstAtt.type || '') : rawFileType,
+        attachments: attachments,
         createdAt: r[12] ? String(r[12]) : '',
         updatedAt: r[13] ? String(r[13]) : ''
       });
@@ -225,10 +255,30 @@ function createTask(task) {
   const id = 'task_' + Date.now();
   const now = new Date().toISOString();
   
-  // Truncate fileUrl if excessively large to avoid Sheet cell limit (50,000 chars)
-  let safeFileUrl = task.fileUrl || '';
-  if (safeFileUrl.length > 45000) {
-    safeFileUrl = safeFileUrl.substring(0, 45000);
+  // จัดการข้อมูลไฟล์แนบ (รองรับหลายไฟล์ หรือไฟล์เดี่ยว)
+  let attachments = [];
+  if (Array.isArray(task.attachments) && task.attachments.length > 0) {
+    attachments = task.attachments;
+  } else if (task.fileUrl) {
+    attachments = [{
+      name: task.fileName || 'ไฟล์แนบ',
+      url: task.fileUrl,
+      directViewUrl: task.directViewUrl || task.fileUrl,
+      type: task.fileType || ''
+    }];
+  }
+
+  let fileUrlVal = '';
+  let fileNameVal = '';
+  let fileTypeVal = '';
+
+  if (attachments.length > 0) {
+    fileUrlVal = JSON.stringify(attachments);
+    if (fileUrlVal.length > 45000) {
+      fileUrlVal = fileUrlVal.substring(0, 45000);
+    }
+    fileNameVal = attachments[0].name || '';
+    fileTypeVal = attachments[0].type || '';
   }
 
   sheet.appendRow([
@@ -241,16 +291,26 @@ function createTask(task) {
     task.deadline || '',
     task.status || 'To Do',
     task.priority || 'Normal',
-    safeFileUrl,
-    task.fileName || '',
-    task.fileType || '',
+    fileUrlVal,
+    fileNameVal,
+    fileTypeVal,
     now,
     now
   ]);
-  
+
+  const createdTask = Object.assign({}, task, {
+    id: id,
+    attachments: attachments,
+    fileUrl: attachments[0] ? attachments[0].url : '',
+    fileName: fileNameVal,
+    fileType: fileTypeVal,
+    createdAt: now,
+    updatedAt: now
+  });
+
   return {
     success: true,
-    data: Object.assign({}, task, { id: id, createdAt: now, updatedAt: now })
+    data: createdTask
   };
 }
 
@@ -272,13 +332,22 @@ function updateTask(task) {
       sheet.getRange(rowIdx, 8).setValue(task.status || 'To Do');
       sheet.getRange(rowIdx, 9).setValue(task.priority || 'Normal');
       
-      if (task.fileUrl !== undefined) {
+      // อัปเดตไฟล์แนบ
+      if (task.attachments !== undefined) {
+        let attachments = Array.isArray(task.attachments) ? task.attachments : [];
+        let fileUrlVal = attachments.length > 0 ? JSON.stringify(attachments) : '';
+        if (fileUrlVal.length > 45000) fileUrlVal = fileUrlVal.substring(0, 45000);
+        
+        sheet.getRange(rowIdx, 10).setValue(fileUrlVal);
+        sheet.getRange(rowIdx, 11).setValue(attachments[0] ? (attachments[0].name || '') : '');
+        sheet.getRange(rowIdx, 12).setValue(attachments[0] ? (attachments[0].type || '') : '');
+      } else if (task.fileUrl !== undefined) {
         let safeFileUrl = task.fileUrl || '';
         if (safeFileUrl.length > 45000) safeFileUrl = safeFileUrl.substring(0, 45000);
         sheet.getRange(rowIdx, 10).setValue(safeFileUrl);
+        if (task.fileName !== undefined) sheet.getRange(rowIdx, 11).setValue(task.fileName || '');
+        if (task.fileType !== undefined) sheet.getRange(rowIdx, 12).setValue(task.fileType || '');
       }
-      if (task.fileName !== undefined) sheet.getRange(rowIdx, 11).setValue(task.fileName || '');
-      if (task.fileType !== undefined) sheet.getRange(rowIdx, 12).setValue(task.fileType || '');
       sheet.getRange(rowIdx, 14).setValue(now);
       
       return { success: true, message: 'Updated successfully' };

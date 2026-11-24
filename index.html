@@ -471,34 +471,27 @@
           </div>
         </div>
 
-        <!-- File Attachment -->
+        <!-- File Attachment (Supports Multiple Files) -->
         <div>
-          <label class="block font-semibold text-slate-700 mb-1">
-            <i class="fa-solid fa-paperclip mr-1 text-slate-400"></i> แนบไฟล์รูปภาพ หรือเอกสาร
-          </label>
-          <div class="border-2 border-dashed border-slate-300 rounded-xl p-4 text-center hover:bg-blue-50/50 hover:border-blue-400 transition cursor-pointer select-none" id="drop-zone">
-            <input type="file" id="form-file-input" class="hidden" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.zip">
+          <div class="flex items-center justify-between mb-1">
+            <label class="block font-semibold text-slate-700">
+              <i class="fa-solid fa-paperclip mr-1 text-slate-400"></i> แนบไฟล์รูปภาพ หรือเอกสาร (แนบได้หลายไฟล์)
+            </label>
+            <span id="form-attachment-counter" class="text-[10px] text-slate-400">0 ไฟล์</span>
+          </div>
+
+          <div class="border-2 border-dashed border-slate-300 rounded-xl p-3.5 text-center hover:bg-blue-50/50 hover:border-blue-400 transition cursor-pointer select-none" id="drop-zone">
+            <input type="file" id="form-file-input" class="hidden" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.zip" multiple>
             <div class="pointer-events-none">
-              <i class="fa-solid fa-cloud-arrow-up text-2xl text-blue-500 mb-1"></i>
-              <p class="text-xs text-slate-700 font-semibold">คลิกเพื่อเลือกไฟล์ หรือลากไฟล์มาวางที่นี่</p>
-              <p class="text-[10px] text-slate-400 mt-0.5">รองรับ รูปภาพ (PNG, JPG), PDF, Word, Excel</p>
+              <i class="fa-solid fa-cloud-arrow-up text-xl text-blue-500 mb-1"></i>
+              <p class="text-xs text-slate-700 font-semibold">คลิกเพื่อเลือกไฟล์ (เลือกได้หลายไฟล์) หรือลากไฟล์มาวางที่นี่</p>
+              <p class="text-[10px] text-slate-400 mt-0.5">รองรับ รูปภาพ (PNG, JPG), PDF, Word, Excel (คลิกเพิ่มได้เรื่อยๆ)</p>
             </div>
           </div>
 
-          <!-- Existing / Uploaded File Indicator -->
-          <div id="file-preview-container" class="hidden mt-2 p-2.5 bg-slate-100 rounded-lg flex items-center justify-between border border-slate-200">
-            <div class="flex items-center gap-2 overflow-hidden">
-              <div id="file-icon-preview" class="w-8 h-8 rounded bg-white flex items-center justify-center text-blue-600 font-bold text-xs shadow-xs">
-                <i class="fa-solid fa-file"></i>
-              </div>
-              <div class="overflow-hidden">
-                <p id="file-name-label" class="font-medium text-slate-800 truncate text-xs">filename.png</p>
-                <a id="file-link-tag" href="#" target="_blank" class="text-[10px] text-blue-600 hover:underline">คลิกเพื่อเปิดดูไฟล์</a>
-              </div>
-            </div>
-            <button type="button" id="btn-remove-file" class="text-rose-500 hover:text-rose-700 p-1 text-xs">
-              <i class="fa-solid fa-trash-can"></i>
-            </button>
+          <!-- Attachments List Container (List of multiple files) -->
+          <div id="attachments-list-container" class="mt-2.5 space-y-1.5 max-h-48 overflow-y-auto">
+            <!-- Injected via JS -->
           </div>
         </div>
 
@@ -570,11 +563,16 @@
           </div>
         </div>
 
-        <!-- Attachment Section -->
-        <div id="detail-attachment-box" style="display: none;" class="hidden">
-          <label class="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">ไฟล์แนบ</label>
-          <div id="detail-attachment-content" class="bg-slate-50 p-3 rounded-xl border border-slate-200">
-            <!-- Injected image or file button -->
+        <!-- Attachment Section (Multiple Files Supported) -->
+        <div id="detail-attachment-box" style="display: none;" class="hidden space-y-2">
+          <div class="flex items-center justify-between">
+            <label class="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+              <i class="fa-solid fa-paperclip mr-1"></i> ไฟล์แนบทั้งหมด
+            </label>
+            <span id="detail-attachment-count" class="text-[10px] font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">0 ไฟล์</span>
+          </div>
+          <div id="detail-attachment-content" class="space-y-2">
+            <!-- Injected image gallery or file cards -->
           </div>
         </div>
       </div>
